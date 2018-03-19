@@ -1,10 +1,3 @@
-/* --------------------------------------------------*/
-/*			MECH 458 Final Project	     */
-/*						     */
-/*	Lab Section:				     */
-/*	Richardo Prajogo		V00763824    */
-/*	Kyle Lu				V00244944    */
-/* --------------------------------------------------*/
 
 // Header Files
 #include <avr/interrupt.h>
