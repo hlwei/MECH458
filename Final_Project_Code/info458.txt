@@ -42,6 +42,7 @@
 % Subroutines
 % void mTimer(int count)
 // void pwm() or speed (OCR1A = 0x40)
+% void conveyor_belt(STATE)
 % void DC_stop();
 % void DC_start();
 % stepper_init();
@@ -53,3 +54,4 @@
 % PORTB = DC_MOTOR [0,3], PWM[7]
 % PORTC = LEDS
 % PORTD = interrupts[0,3]
+% PORTF = F[1] reflective sensor
