@@ -1,0 +1,55 @@
+##### Variables pre-define #####
+
+
+# Global Variables:
+
+% STATE	 (state of the sorting system)
+% 			STATE = 0x00 	(paused)
+%			STATE = 0x01	(activated)
+
+% ADC_conversion
+%			ADC_result
+%			ADC_resultH
+%			ADC_resultL
+%			Material
+
+% Stepper Motor
+%			init_flag (check the initial position)
+%			steps =  0, 90, 180, 270 degrees (for 4 bins)
+
+% DC_Motor
+
+
+% Cylinders Detection
+% ALU_max
+% ALU_min
+% STL_max
+% STL_min
+% WPL_max
+% WPL_min
+% BPL_min
+% BPL_max
+
+
+% Linked-queue for Cylinders info storage
+% link *head
+% link *tail
+% link *newlink = NULL;
+% link *rtnlink = NULL;
+% for other inits, refer to the code in lab session (Linked-queue)
+
+
+% Subroutines
+% void mTimer(int count)
+// void pwm() or speed (OCR1A = 0x40)
+% void DC_stop();
+% void DC_start();
+% stepper_init();
+% stepper_state(ALU, STL, WPL, BPL)
+
+
+% PORTS definition
+% PORTA = Stepper
+% PORTB = DC_MOTOR [0,3], PWM[7]
+% PORTC = LEDS
+% PORTD = interrupts[0,3]
