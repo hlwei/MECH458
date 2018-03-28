@@ -1,3 +1,10 @@
+/* University of Victoria 2018 Spring MECH 458 Final Proeject */
+/* STUDENT1: Zhuo Li V00885451 */
+/* STUDENT2: Henglai Wei V00884728 */
+
+
+
+
 /* Header files */
 
 #include <stdlib.h>
