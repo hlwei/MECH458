@@ -1,5 +1,5 @@
 # MECH458 Course project - sorting system
-## Code contributions by Zhuo Li & Heng-Lai WEi in Uvic
+## Code contributions by Zhuo Li & Heng-Lai Wei in Uvic
 
 FOLDERS: 
 
