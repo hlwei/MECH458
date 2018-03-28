@@ -9,3 +9,4 @@ FOLDERS:
 
 (3) Reference: sample code.
 
+![Alt text](https://github.com/hlwei/MECH458/blob/master/imgs/WechatIMG75.jpeg)
