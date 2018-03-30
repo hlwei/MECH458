@@ -206,3 +206,34 @@ i = 0;
 	}
 	return;
 }
+
+
+// DC motor part＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
+
+#define FORWARD 0b00001000 //Commands for motor direction
+#define REVERSE 0b00000100
+#define BRAKE	0b00000000
+
+void setMotorSpeed(char speed) {
+	OCR0A = speed;
+}
+
+void setMotorFwd() {
+	PORTC = (PORTC & 0xF0) | 0b00001000;
+	PORTB = FORWARD;
+}
+
+void setMotorRev() {
+	PORTC = (PORTC & 0xF0) | 0b00000001;
+	PORTB = REVERSE;
+}
+
+void setMotorBrake() {
+	PORTC = (PORTC & 0xF0) | 0b00000000;
+	PORTB = BRAKE;
+}
+
+void setMotorSlide() {
+	PORTC = (PORTC & 0xF0) | 0b00000110;
+	PORTB = SLIDE;
+}
