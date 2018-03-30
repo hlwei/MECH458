@@ -16,14 +16,12 @@
 /* ------------------------------- */
 void configIO();
 void configInterrupts();
-void configTimers();
 void configPWM();
 void configADC();
 
-/* --------- System Ctrls --------- */
+/* --------- Motors Ctrls --------- */
 /* -------------------------------- */
-void beltCtrl(char sysSTATE);		// STATE = run, stop, pause Button, RampDown Button
-void DCMotorCtrl();
+void DCMotorCtrl(char sysSTATE);		// STATE = run, stop, pause Button, RampDown Button
 void stepperCtrl(int current_bin, int sort_bin)	
 void stepperInit();				// Init by HE sensor
 
@@ -37,7 +35,7 @@ void mTimer(int delay);			// timer for delay
 
 /* Motors */
 // For DC motor
-volatile unsigned char dutyCycle = 0x80; // set PWM = 50%
+volatile unsigned char dutyCycle = 0x80; 	// set PWM = 50%
 volatile unsigned char DC_cw = 0x02;		// DC clockwise
 volatile unsigned char DC_ccw = 0x04		// DC counter-clockwise
 volatile unsigned char DC_vccstop = 0x00  	// vcc stop DC motot
@@ -51,11 +49,15 @@ volatile unsigned char ObjectReciv;
 /* Sensors */
 // For optical sensor IO
 volatile unsigned int Count_OptIO = 0x00;
-volatile unsigned int EnterFlagl;
+volatile unsigned int Enter_Flag = 0;
 // For inductive sensor IN
 volatile unsigned int Count_IndIN = 0x00;
+volatile unsigned int Inductive_Flag = 0;
+
 // For optical sensor OR
 volatile unsigned int Count_OptOR = 0x00;
+volatile unsigned int OR_Flag = 0;
+
 
 // For reflective sensor RL ADC
 volatile unsigned int Count_RefRL;
@@ -63,13 +65,13 @@ volatile unsigned char ADC_resultH;
 volatile unsigned char ADC_resultL;
 volatile unsigned int ADC_result;
 volatile unsigned int ADC_result_Flag;
-volatile unsigned int Reflectness; // 16_bit to save 10-bit ADC reflectness
+volatile unsigned int ADC_min =  1024; // 16_bit to save 10-bit ADC reflectness
 
 // For optical sensor EX
 volatile unsigned int Count_OptEX;
-volatile unsigned int ExitFlag;
+volatile unsigned int Exit_Flag = 0;
 // For Hall Effect sensor HE
-volatile unsigned int HallFlag;
+volatile unsigned int Hall_Flag;
 
 /* System State */
 volatile unsigned char sysSTATE = ['run0','pause1','stop2','RampDown3'];
@@ -83,15 +85,17 @@ volatile unsigned char sysSTATE = ['run0','pause1','stop2','RampDown3'];
 #define WPL_MIN = 601;
 #define WPL_MAX = 950;
 #define BPL_MIN = 951;
+#define BPL_MAX = 1024;
 
 
 typedef struct cylinderMATERIAL{
-	unsigned int refl;
+	
 	int inductive;		// 0 non ferrous, 1 ferrous
 	int category;		// AL = 0; STL = 1; WPL = 2; BPL = 3; UNKnown = 4;
 
 };
-volatile cylinderMATERIAL CylindersINFO[48];
+
+volatile unsigned int Num_record = 0x00;	// number of cylinders ADCed
 
 
 
@@ -101,26 +105,66 @@ volatile cylinderMATERIAL CylindersINFO[48];
 /* --------------------------------------- */
 int main()
 {
-	/* user parameters define here */
-
-
-
+	struct cylinderMATERIAL cylin[48];
 
 	cli();			// Disable all interrupts
 	void configIO();
 	void configInterrupts();
-	void configTimers();
 	void configPWM();
 	void configADC();
 	sei();			// enable all interrupts
 
+
+	/* Initialization */
+
 	/* DC and Stepper Initialization here */
 	stepperInit();
-
+	DCMotorCtrl(0);		// start the belt
 
 	// Start Polling 
+	
 	while(1){
-		/* Sorting code here */
+		if (Enter_Flag = 1){
+			Enter_Flag = 0;
+		}
+		if (Inductive_Flag = 1){
+			Inductive_Flag = 0;
+			cylin[Count_OptIO-1].inductive = 1;
+		}
+		if (OR_Flag = 1){
+			OR_Flag = 0;
+
+		}
+		if (ADC_result_Flag = 1){
+			ADC_result_Flag = 0;
+			mTimer(50);
+			if (ADC_min <= AL_MAX)
+			{
+				cylin[Count_OptOR-1].category = 0; // Alluminum
+			}
+			else if (ADC_min <= STL_MAX)
+			{
+				cylin[Count_OptOR-1].category = 1; // Steel
+			}
+			else if (ADC_min <= WPL_MAX){
+				cylin[Count_OptOR-1].category = 2; // White plastic
+			}
+			else if (ADC_min <= BPL_MAX){
+				cylin[Count_OptOR-1].category = 3; // Blk plastic
+			}
+			else
+				cylin[Count_OptOR-1].category = 4; // Unknown
+		}
+		if (Exit_Flag = 1)
+		{
+			Exit_Flag = 0;
+			DCMotorCtrl(1);		// stop the DC motor
+			stepperCtrl();		// rotate the bin
+			DCMotorCtrl(0);		// reng dao wan li
+			mTimer(50);
+			DCMotorCtrl(1);
+
+		}
 	}
 
 	return 0;
@@ -131,10 +175,6 @@ int main()
 
 
 /* LIGNE */
-
-
-
-
 
 
 /* --------------- Motors Ctrl ------------ */
@@ -176,8 +216,9 @@ void configIO(){
 
 void configPWM(int duty_cyc){
 	TCCR0A |= _BV(WGM00) | _BV(WGM01) | _BV(COM0A1);
+	TCCROB |= _BV(CS01);
+	TIMSK0 |= _BV(OCIE0A);
 	OCR0A = duty_cyc;
-	PORTB = dc_clockwise;
 }
 
 // la Fini, Mar 29, 3PM
@@ -235,13 +276,24 @@ ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 	ADC_result |= ADC_resultL;
 
 	//Reflectness = ADC_result
+	if (ADC_result <= ADC_min){
+		ADC_min = ADC_result;
+	}
 
+	int outC;
+	outC = (0b1111111100 | ADC_min);
+	outC = outC >> 2;
+	unsigned char OUTC;
+	OUTC = outC;
+	
+	PORTC = OUTC;
 	ADC_result_Flag = 1;
 }
 
 
 // For optical 1, IO, PD0, INT0
 ISR(INT0_vect){
+	Enter_Flag = 1;
 	Count_OptIO++;		// optical 1, PD0
 }
 
@@ -253,6 +305,7 @@ ISR(INT1_vect){
 
 // For optical 2, OR, PD2, INT2, la Fini
 ISR(INT2_vect){					//  optical 2, PD2 
+	OR_Flag = 1;
 	Count_OptOR++;
 	ADCSRA|= _BV(ADSC); 		// rising on INT2, start ADC conversion
 
@@ -260,34 +313,52 @@ ISR(INT2_vect){					//  optical 2, PD2
 
 // For optical 3, EX, PD3, INT3
 ISR(INT3_vect){
+	Exit_Flag = 1;
 	Count_OptEX++;
 }
 
 // For press buttom low to stop/resume the belt, PE4, INT4
 ISR(INT4_vect){
-	DCMotorCtrl("pause");		// Vcc stop the dc motor, PE4 for falling edge press button
+	mTimer(5);
+	DCMotorCtrl(1);		// Vcc stop the dc motor, PE4 for falling edge press button
+	mTimer(5);
 }
 
 
 // For Hall effect sonsor under the stepper, PE5, INT5
 ISR(INT5_vect){
-	stepperStop();
-	stepperInitFlag = 1;
-	stepperPosition = 0x00;
+
+	Hall_Flag = 1;
+
 }
 
 // For press button high, PE6
 ISR(INT6_vect){
-	DCMotorCtrl();
+	DCMotorCtrl(3);
 }
-
-
 
 
 /* --------- Timers Calling --------- */
 /* -------------------------------- */
 // For timer interrupt
-ISR(TIMER1_OVF_vect){
-	TIFR1 |= 0x01;
-}
+void mTimer(int delay){
+	/* Set the waveform generation mode (WGM) bit description to clear timer on compare math mode (CTC) only */
+	int i;
+	TCCR1B |= _BV(WGM12);	// this will set the WGM bits to 0100, WGM is spread over two registers
+	OCR1A = 0x03e8;			// 1000 cycles = 1ms, set output register for 1000 cycles
+	TCNT1 = 0x0000;			// set the initial value of the timer counter to 0x0000
+	TIMSK1 |= TIMSK1 | 0b00000010;	// Enable the output compare interrupt enable
 
+	// clear the timer interrupt flag and begin timer
+
+	TIFR1 |= _BV(OCF1A);
+	// polling the timer to determine when the timer has reached 0x03e8=1000
+
+	while(i<delay){// clear the interrupt falg by writting a 1 to the bit
+		if ((TIFR1 & 0x02) == 0x02)
+		{
+			TIFR1 |= _BV(OCF1A);
+			i++;
+		}
+	}
+}
