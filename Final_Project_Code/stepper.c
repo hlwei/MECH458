@@ -235,5 +235,7 @@ void setMotorBrake() {
 
 void setMotorSlide() {
 	PORTC = (PORTC & 0xF0) | 0b00000110;
-	PORTB = SLIDE;
+	PORTB = FORWARD;
+	mTimer(100);
+	PORTB = BRAKE;
 }
