@@ -347,7 +347,7 @@ void mTimer(int delay){
 	TCCR1B |= _BV(WGM12);	// this will set the WGM bits to 0100, WGM is spread over two registers
 	OCR1A = 0x03e8;			// 1000 cycles = 1ms, set output register for 1000 cycles
 	TCNT1 = 0x0000;			// set the initial value of the timer counter to 0x0000
-	TIMSK1 |= TIMSK1 | 0b00000010;	// Enable the output compare interrupt enable
+	//TIMSK1 |= TIMSK1 | 0b00000010;	// Enable the output compare interrupt enable
 
 	// clear the timer interrupt flag and begin timer
 
