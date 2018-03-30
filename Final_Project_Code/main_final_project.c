@@ -91,7 +91,7 @@ volatile unsigned char sysSTATE = ['run0','pause1','stop2','RampDown3'];
 typedef struct cylinderMATERIAL{
 	
 	int inductive;		// 0 non ferrous, 1 ferrous
-	int category;		// AL = 0; STL = 1; WPL = 2; BPL = 3; UNKnown = 4;
+	int category;		// AL = 0; STL = 2; WPL = 3; BPL = 1; UNKnown = 4;
 
 };
 
