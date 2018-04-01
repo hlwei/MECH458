@@ -3,10 +3,7 @@
 #include <stdlib.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include "interrupt.h"
 #include <math.h>
-
-
 
 
 /* ------------ Subroutines List ------------ */
@@ -22,8 +19,9 @@ void configADC();
 /* --------- Motors Ctrls --------- */
 /* -------------------------------- */
 void DCMotorCtrl(char sysSTATE);		// STATE = run, stop, pause Button, RampDown Button
-void stepperCtrl(int current_bin, int sort_bin)	
-void stepperInit();				// Init by HE sensor
+void stepper_Home();
+void stepperRotate();
+void stepperSorting(int CurrentPosition, int DesiredPosition); // stepper sorting function 
 
 /* --------- Timers Calling --------- */
 /* -------------------------------- */
@@ -41,9 +39,17 @@ volatile unsigned char DC_ccw = 0x04		// DC counter-clockwise
 volatile unsigned char DC_vccstop = 0x00  	// vcc stop DC motot
 
 // For stepper motor
-volatile unsigned char stepPORTA[4] = [s1, s2, s3, s4];
-volatile unsigned char Steps[4] = [-90, 0, 90, 180]; // to do
 volatile unsigned char ObjectReciv;
+#define STEP1 0b00110000;
+#define STEP2 0b00000110;
+#define STEP3 0b00101000;
+#define STEP4 0b00000101;
+#define CLOCKWISE 1;
+#define WIDDERSHINS -1;
+char stepper_State;			// s1, s2, s3 ou s4
+
+char CurrentPosition;		// AL0, Blk1, Whit2, STL3, Unknown4
+char DesiredPosition;
 
 
 /* Sensors */
@@ -74,7 +80,7 @@ volatile unsigned int Exit_Flag = 0;
 volatile unsigned int Hall_Flag;
 
 /* System State */
-volatile unsigned char sysSTATE = ['run0','pause1','stop2','RampDown3'];
+// volatile unsigned char sysSTATE = ['run0','pause1','stop2','RampDown3'];
 
 /* Cylinder Info Storage */
 // For reflective values of different materials
@@ -89,7 +95,7 @@ volatile unsigned char sysSTATE = ['run0','pause1','stop2','RampDown3'];
 
 
 typedef struct cylinderMATERIAL{
-	
+
 	int inductive;		// 0 non ferrous, 1 ferrous
 	int category;		// AL = 0; STL = 2; WPL = 3; BPL = 1; UNKnown = 4;
 
@@ -106,6 +112,7 @@ volatile unsigned int Num_record = 0x00;	// number of cylinders ADCed
 int main()
 {
 	struct cylinderMATERIAL cylin[48];
+
 
 	cli();			// Disable all interrupts
 	void configIO();
@@ -129,40 +136,42 @@ int main()
 		}
 		if (Inductive_Flag = 1){
 			Inductive_Flag = 0;
-			cylin[Count_OptIO-1].inductive = 1;
+			if (Count_OptIO >= 1)
+			{
+				cylin[Count_OptIO-1].inductive = 1;
+			}
 		}
+
 		if (OR_Flag = 1){
 			OR_Flag = 0;
-
 		}
+
 		if (ADC_result_Flag = 1){
 			ADC_result_Flag = 0;
-			mTimer(50);
 			if (ADC_min <= AL_MAX)
 			{
 				cylin[Count_OptOR-1].category = 0; // Alluminum
 			}
 			else if (ADC_min <= STL_MAX)
 			{
-				cylin[Count_OptOR-1].category = 1; // Steel
+				cylin[Count_OptOR-1].category = 2; // Steel
 			}
 			else if (ADC_min <= WPL_MAX){
-				cylin[Count_OptOR-1].category = 2; // White plastic
+				cylin[Count_OptOR-1].category = 3; // White plastic
 			}
 			else if (ADC_min <= BPL_MAX){
-				cylin[Count_OptOR-1].category = 3; // Blk plastic
+				cylin[Count_OptOR-1].category = 1; // Blk plastic
 			}
 			else
 				cylin[Count_OptOR-1].category = 4; // Unknown
 		}
+
 		if (Exit_Flag = 1)
-		{
+		{	
+			DCMotorCtrl(1);		// belt stop for 0.5s
+			mTimer(500);
 			Exit_Flag = 0;
-			DCMotorCtrl(1);		// stop the DC motor
-			stepperCtrl();		// rotate the bin
-			DCMotorCtrl(0);		// reng dao wan li
-			mTimer(50);
-			DCMotorCtrl(1);
+			DCMotorCtrl(0);
 
 		}
 	}
@@ -171,10 +180,6 @@ int main()
 }
 
 
-
-
-
-/* LIGNE */
 
 
 /* --------------- Motors Ctrl ------------ */
@@ -196,6 +201,92 @@ void DCMotorCtrl(sysSTATE){
 			break;
 	}
 }
+
+void stepper_Home(){
+	
+
+    while(Hall_Flag == 0){
+			
+			if (Hall_Flag == 0){
+				PORTA = STEP1;
+				mTimer(20);
+				stepper_State = 1;
+			}
+			if (Hall_Flag == 0){
+				PORTA = STEP2;
+				mTimer(20);
+				stepper_State = 2;
+			}
+			if (Hall_Flag == 0){
+				PORTA = STEP3;
+				mTimer(20);
+				stepper_State = 3;
+			}
+			if (Hall_Flag == 0){
+				PORTA = STEP4;
+				mTimer(20);
+				stepper_State = 4;
+			}
+			//stepperRotate(1,1);
+			CurrentPosition = 1;
+
+		  
+	}
+}
+
+void stepperRotate(int steps, int direction) {
+	int delay = 20;
+	int i;
+	int stepnum =stepper_State;
+	for(i=0;i<steps;i++){
+		if(direction == 1)  stepnum = ((stepnum % 4) + 1);
+		if(direction == -1)  stepnum = ((stepnum - 1) % 4);
+		if(stepnum == 0){ stepnum = 4;}
+		switch(stepnum){
+			case(1):
+				PORTA = STEP1;
+				mTimer(delay);
+                stepper_State=1;
+				break;
+			case(2):
+				PORTA = STEP2;
+				mTimer(delay);
+				stepper_State=2;
+				break;
+			case(3):
+				PORTA = STEP3;
+				mTimer(delay);
+				stepper_State=3;
+				break;
+			case(4):
+				PORTA = STEP4;
+				mTimer(delay);
+				stepper_State=4;
+				break;
+			default: break;
+		}//switch
+		if((i>=15) && ((steps - i) >= 15)) delay = 12; //acceleration
+	
+	}//for
+} 
+
+
+//stepper_position
+void stepperSorting(int CurrentPosition, int DesiredPosition){
+
+	int diff = (DesiredPosition - CurrentPosition);
+	if((diff == 1) || (diff == -3)){
+	stepperRotate(50, 1);
+	}
+	else if((diff == -1) || (diff == 3)){ 
+	stepperRotate(50, -1);
+	}
+	else if((diff == 2) || (diff == -2)){
+	stepperRotate(100, 1);
+	}
+	CurrentPosition = DesiredPosition;
+}
+
 
 
 
@@ -273,20 +364,13 @@ ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 	ADC_result = ADC_resultH;
 	ADC_result = (ADC_result << 2);
 
-	ADC_result |= ADC_resultL;
+	ADC_result |= ADC_resultL;		// 10-bit ADC values saved in 16-bit u_int 
 
-	//Reflectness = ADC_result
-	if (ADC_result <= ADC_min){
+
+	//if (ADC_result <= ADC_min){
 		ADC_min = ADC_result;
-	}
+	//}
 
-	int outC;
-	outC = (0b1111111100 | ADC_min);
-	outC = outC >> 2;
-	unsigned char OUTC;
-	OUTC = outC;
-	
-	PORTC = OUTC;
 	ADC_result_Flag = 1;
 }
 
@@ -307,34 +391,41 @@ ISR(INT1_vect){
 ISR(INT2_vect){					//  optical 2, PD2 
 	OR_Flag = 1;
 	Count_OptOR++;
+	ADC_min =  1024;			// reset ADC_min value
 	ADCSRA|= _BV(ADSC); 		// rising on INT2, start ADC conversion
+
 
 }
 
 // For optical 3, EX, PD3, INT3
 ISR(INT3_vect){
-	Exit_Flag = 1;
 	Count_OptEX++;
+
+	if (Count_OptEX <= 48)
+	{
+		DesiredPosition = cylin[Count_OptEX-1].category;
+		stepperSorting(CurrentPosition, DesiredPosition);
+	}
+	
+	Exit_Flag = 1;
 }
 
 // For press buttom low to stop/resume the belt, PE4, INT4
 ISR(INT4_vect){
-	mTimer(5);
-	DCMotorCtrl(1);		// Vcc stop the dc motor, PE4 for falling edge press button
-	mTimer(5);
+	//mTimer(5);
+	//DCMotorCtrl(1);		// Vcc stop the dc motor, PE4 for falling edge press button
+	//mTimer(5);
 }
 
 
 // For Hall effect sonsor under the stepper, PE5, INT5
 ISR(INT5_vect){
-
 	Hall_Flag = 1;
-
 }
 
 // For press button high, PE6
 ISR(INT6_vect){
-	DCMotorCtrl(3);
+	//DCMotorCtrl(3);
 }
 
 
