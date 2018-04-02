@@ -27,10 +27,7 @@ volatile unsigned char DC_vccstop = 0x00;  	// vcc stop DC motot
 #define STEP4 0b00000101;
 #define CLOCKWISE 1;
 #define WIDDERSHINS -1;
-char init_stepper_flag;
 char stepper_State;			// s1, s2, s3 ou s4
-
-
 char CurrentPosition;		// AL0, Blk1, Whit2, STL3, Unknown4
 char DesiredPosition;
 
@@ -45,21 +42,20 @@ volatile unsigned int Count_IndIN = 0x00;
 volatile unsigned int Inductive_Flag = 0;
 
 // For optical sensor OR
-volatile unsigned int Count_OptOR = 0x00;
+unsigned int Count_OptOR = 0;
 volatile unsigned int OR_Flag = 0;
 
 
 
 // For reflective sensor RL ADC
-volatile unsigned int Count_RefRL;
 volatile unsigned char ADC_resultH;
 volatile unsigned char ADC_resultL;
 volatile unsigned int ADC_result;
-volatile unsigned int ADC_result_Flag;
-volatile unsigned int ADC_min =  1024; // 16_bit to save 10-bit ADC reflectness
+volatile unsigned int ADC_result_Flag=0;
+volatile unsigned int ADC_min =  0xff; // 16_bit to save 10-bit ADC reflectness
 
 // For optical sensor EX
-volatile unsigned int Count_OptEX;
+volatile unsigned int Count_OptEX = 0;
 volatile unsigned int Exit_Flag = 0;
 // For Hall Effect sensor HE
 unsigned int Hall_Flag = 0;
@@ -68,27 +64,26 @@ unsigned int Hall_Flag = 0;
 void mTimer(); //timer1
 void stepper_Home();
 void stepperRotate();
-void stepperSorting(int CurrentPosition, int DesiredPosition);
+int stepperSorting(int CurrentPosition, int DesiredPosition);
 
 
 
 typedef struct cylinderMATERIAL{
-
 	int inductive;		// 0 non ferrous, 1 ferrous
 	int category;		// AL = 0; STL = 2; WPL = 3; BPL = 1; UNKnown = 4;
 
 };
-
+struct cylinderMATERIAL cylin[48];
 /* Cylinder Info Storage */
 // For reflective values of different materials
 // AL = 0-250;	STL = 251-600;  WhPLT = 601-950;	BlPLT = 951-1024;
-#define AL_MAX  250
-#define STL_MIN  251
-#define STL_MAX  600
-#define WPL_MIN  601
-#define WPL_MAX  950
-#define BPL_MIN  951
-#define BPL_MAX  1024
+int AL_MAX = 150;
+
+int STL_MAX = 500;
+
+int WPL_MAX = 750;
+
+int BPL_MAX = 1020;
 
 
 
@@ -96,15 +91,7 @@ typedef struct cylinderMATERIAL{
 // Main function======================================================
 void main() 
 {	
-	struct cylinderMATERIAL cylin[48];
-	cylin[0].category = 0;
-	cylin[1].category = 2;
-	cylin[2].category = 1;
-	cylin[3].category = 3;
-	cylin[4].category = 1;
-	cylin[5].category = 0;
-	cylin[6].category = 0;
-	cylin[7].category = 3;
+	
 	cli();
 
 	configIO();
@@ -127,43 +114,28 @@ void main()
 				cylin[Count_OptIO-1].inductive = 1;
 			}
 		}
-
+        
+	/*	if (ADC_result_Flag == 1){
+		
+			ADC_result_Flag = 0;
+		}
+		*/
 		if (OR_Flag == 1){
 			OR_Flag = 0;
 		}
-
-        /*
-		if (ADC_result_Flag == 1){
-			ADC_result_Flag = 0;
-			if(ADC_min <= AL_MAX)
-			{
-				cylin[Count_OptOR-1].category = 0; // Alluminum
-			}
-			else if(ADC_min <= STL_MAX)
-			{
-				cylin[Count_OptOR-1].category = 2; // Steel
-			}
-			else if(ADC_min <= WPL_MAX){
-				cylin[Count_OptOR-1].category = 3; // White plastic
-			}
-			else if(ADC_min <= BPL_MAX){
-				cylin[Count_OptOR-1].category = 1; // Blk plastic
-			}
-			else
-				cylin[Count_OptOR-1].category = 4; // Unknown
-		}*/
-		//PORTC = cylin[Count_OptOR-1].category;
 		if (Exit_Flag == 1)
 		{	
 			DCMotorCtrl(1);		// belt stop for 0.5s
 			
-			
 			DesiredPosition = cylin[Count_OptEX-1].category;
-		    stepperSorting(CurrentPosition, DesiredPosition);
-			DCMotorCtrl(0);
+			
+		    CurrentPosition = stepperSorting(CurrentPosition, DesiredPosition);
+			PORTC = CurrentPosition;
+			mTimer(500);
+			
 		    Exit_Flag = 0;
 		}
-		
+		DCMotorCtrl(0);
 
 	}
 
@@ -279,6 +251,7 @@ void stepper_Home(){
 
 		  
 	}
+	CurrentPosition = 1;
 }
 
 void stepperRotate(int steps, int direction) {
@@ -314,12 +287,12 @@ void stepperRotate(int steps, int direction) {
 		}//switch
 		if((i>=15) && ((steps - i) >= 15)) delay = 12; //acceleration
 	
-	}//for
+	}
 } 
 
 
 //stepper_position
-void stepperSorting(int CurrentPosition, int DesiredPosition){
+int stepperSorting(int CurrentPosition, int DesiredPosition){
 
 	int diff = (DesiredPosition - CurrentPosition);
 	if((diff == 1) || (diff == -3)){
@@ -331,7 +304,13 @@ void stepperSorting(int CurrentPosition, int DesiredPosition){
 	else if((diff == 2) || (diff == -2)){
 	stepperRotate(100, 1);
 	}
+	else
+	{
+	stepperRotate(0, 1);
+	}
 	CurrentPosition = DesiredPosition;
+
+	return CurrentPosition;
 }
 
 
@@ -346,27 +325,11 @@ ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 	ADC_resultH = ADCH;
 	ADC_resultL = ADCL;
 
-	//ADC_resultH = (ADC_resultH & 0b11111111);
-	//ADC_resultL = (ADC_resultL & 0b11000000);
-	//ADC_resultL = (ADC_resultL >> 6);
-
-	//ADC_result = ADC_resultH;
-	//ADC_result = (ADC_result << 2);
-
-	//ADC_result |= ADC_resultL;		// 10-bit ADC values saved in 16-bit u_int 
-
-
-	//if (ADC_result <= ADC_min){
-		//ADC_min = ADC_result;
-	//}
 	ADC_min = ADC_resultH;
 	ADC_min = ADC_min<<2;
-
 	ADC_result_Flag = 1;
 		    
 }
-
-
 
 
 
@@ -384,22 +347,42 @@ ISR(INT1_vect){
 
 // For optical 2, OR, PD2, INT2, la Fini
 ISR(INT2_vect){					//  optical 2, PD2 
+	
+	Count_OptOR=Count_OptOR+1;
 	OR_Flag = 1;
-	Count_OptOR++;
-	ADC_min =  1024;			// reset ADC_min value
+	ADC_min =  0xff;			// reset ADC_min value
 	ADCSRA|= _BV(ADSC); 		// rising on INT2, start ADC conversion
-}
+
+			if(ADC_min <= AL_MAX)
+			{
+				cylin[Count_OptOR-1].category = 0; // Alluminum
+			}
+			else if(ADC_min <= STL_MAX)
+			{
+				cylin[Count_OptOR-1].category = 0; // Steel
+			}
+			else if(ADC_min <= WPL_MAX){
+				cylin[Count_OptOR-1].category = 2; // White plastic
+			}
+			else if(ADC_min <= BPL_MAX){
+				cylin[Count_OptOR-1].category = 2; // Blk plastic
+			}
+			else
+				cylin[Count_OptOR-1].category = 4; // Unknown
+
+
+	}
 
 // For optical 3, EX, PD3, INT3
 ISR(INT3_vect){
-	Count_OptEX++;
+	Count_OptEX=Count_OptEX+1;
 	struct cylinderMATERIAL cylin[48];
 
-	if (Count_OptEX <= 48)
+	/*if (Count_OptEX <= 48)
 	{
 		DesiredPosition = cylin[Count_OptEX-1].category;
 		stepperSorting(CurrentPosition, DesiredPosition);
-	}
+	}*/
 	Exit_Flag = 1;
 	
 }
