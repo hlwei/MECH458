@@ -14,7 +14,7 @@ void configADC();
 
 /* Motors */
 // For DC motor
-volatile unsigned char dutyCycle = 0x40; 	// set PWM = 50%
+volatile unsigned char dutyCycle = 0x80; 	// set PWM = 50%
 volatile unsigned char DC_cw = 0x04;		// DC clockwise
 volatile unsigned char DC_ccw = 0x02;		// DC counter-clockwise
 volatile unsigned char DC_vccstop = 0x00;  	// vcc stop DC motot
@@ -52,7 +52,7 @@ volatile unsigned char ADC_resultH;
 volatile unsigned char ADC_resultL;
 volatile unsigned int ADC_result;
 volatile unsigned int ADC_result_Flag=0;
-volatile unsigned int ADC_min =  0xff; // 16_bit to save 10-bit ADC reflectness
+volatile unsigned int ADC_min; // 16_bit to save 10-bit ADC reflectness
 
 // For optical sensor EX
 volatile unsigned int Count_OptEX = 0;
@@ -77,13 +77,15 @@ struct cylinderMATERIAL cylin[48];
 /* Cylinder Info Storage */
 // For reflective values of different materials
 // AL = 0-250;	STL = 251-600;  WhPLT = 601-950;	BlPLT = 951-1024;
-int AL_MAX = 150;
+int AL_MAX = 67;
 
-int STL_MAX = 500;
+int STL_MIN = 423;
 
-int WPL_MAX = 750;
+int WPL_MIN = 862;
 
-int BPL_MAX = 1020;
+int WPL_MAX = 870;
+
+int BPL_MIN = 924;
 
 
 
@@ -102,7 +104,8 @@ void main()
 	sei();
 	stepper_Home();
 	DCMotorCtrl(0);
-
+    //ADCSRA|= _BV(ADSC);
+	//PORTC=0xff;
 	while(1){
 		if (Enter_Flag == 1){
 			Enter_Flag = 0;
@@ -115,14 +118,9 @@ void main()
 			}
 		}
         
-	/*	if (ADC_result_Flag == 1){
-		
-			ADC_result_Flag = 0;
-		}
-		*/
-		if (OR_Flag == 1){
+		/*if (OR_Flag == 1){
 			OR_Flag = 0;
-		}
+		}*/
 		if (Exit_Flag == 1)
 		{	
 			DCMotorCtrl(1);		// belt stop for 0.5s
@@ -130,8 +128,8 @@ void main()
 			DesiredPosition = cylin[Count_OptEX-1].category;
 			
 		    CurrentPosition = stepperSorting(CurrentPosition, DesiredPosition);
-			PORTC = CurrentPosition;
-			mTimer(500);
+			//PORTC = CurrentPosition;
+			mTimer(200);
 			
 		    Exit_Flag = 0;
 		}
@@ -151,7 +149,7 @@ void configIO(){
 	DDRA = 0xff;	// PORTA output, Stepper motor drive
 	DDRB = 0xff;	// PORTB output, DC motor drive
 	DDRC = 0xff;	// PORTC output, LEDs debugging
-	DDRD = 0x00;	// PORTD[0,3] input, interrupts
+	DDRD = 0xF0;	// PORTD[0,3] input, interrupts
 	DDRE = 0x00;	// PORTE[4,7] input, interrupts
 	DDRF = 0x00;	// PORTF1 Reflective ADC interupt
 }
@@ -171,8 +169,7 @@ void configADC(){
 	ADCSRA |= _BV(ADIE);							// enable interrupt of adc
 	ADCSRA |= (_BV(ADPS2) | _BV(ADPS0));			// adc scaler division factor 32
 	//ADCSRA |= _BV(ADSC)		// for the first conversion
-	
-	ADMUX |= _BV(ADLAR);							// set 10bit ADC value structure, ADCH[7,0] = ADC[9,2], ADCL[7,6] = ADC[1,0]
+							// set 10bit ADC value structure, ADCH[7,0] = ADC[9,2], ADCL[7,6] = ADC[1,0]
 	ADMUX |= _BV(REFS0); 			// Vcc 3.3v Voltage reference with external capacitor on AREF pin
 	ADMUX |= _BV(MUX0);								// channel select, ADC1
 
@@ -285,7 +282,7 @@ void stepperRotate(int steps, int direction) {
 				break;
 			default: break;
 		}//switch
-		if((i>=15) && ((steps - i) >= 15)) delay = 12; //acceleration
+		if((i>=3) && ((steps - i) >= 3)) delay = 12; //acceleration
 	
 	}
 } 
@@ -321,14 +318,35 @@ int stepperSorting(int CurrentPosition, int DesiredPosition){
 // For ADC conversion, RL, PF1, INTADC, la Fini Mar 29, 3.25PM
 ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 	
+	if (ADC < ADC_min){
+		ADC_min = ADC;
+	}
 
-	ADC_resultH = ADCH;
-	ADC_resultL = ADCL;
+	if ((PIND & 0x04) == 4){
+		ADCSRA |= _BV(ADSC);
+	}
+    else{
+			if(ADC_min <= 255)
+			{
+				cylin[Count_OptOR-1].category = 0; // Alluminum
+			}
+			else if(ADC_min <= 700)
+			{
+				cylin[Count_OptOR-1].category = 3; // Steel
+			}
+			else if(ADC_min <= 925){
+				cylin[Count_OptOR-1].category = 2; // White plastic
+			}
+			else if(ADC_min <= 1024){
+				cylin[Count_OptOR-1].category = 1; // Blk plastic
+			}
+			else
+				cylin[Count_OptOR-1].category = 4; // Unknown
+		/*PORTC = ADC_min;
+		PORTD = (ADC_min & 0xFF00) >> 3;
+		mTimer(2000);*/
 
-	ADC_min = ADC_resultH;
-	ADC_min = ADC_min<<2;
-	ADC_result_Flag = 1;
-		    
+	}
 }
 
 
@@ -343,40 +361,26 @@ ISR(INT0_vect){
 // For inductive, IN, PD1, INT1
 ISR(INT1_vect){
 	Count_IndIN++;				// inductive, PD1, for metal cylinders, for falling edge trigger
+
+	//DCMotorCtrl(1);
+	//mTimer(1000);
+	//PORTC = 0xf0;
 }
 
 // For optical 2, OR, PD2, INT2, la Fini
 ISR(INT2_vect){					//  optical 2, PD2 
 	
 	Count_OptOR=Count_OptOR+1;
-	OR_Flag = 1;
-	ADC_min =  0xff;			// reset ADC_min value
+	ADC_min = 0xffff;
+	//ADC_min =  0xff;			// reset ADC_min value
 	ADCSRA|= _BV(ADSC); 		// rising on INT2, start ADC conversion
-
-			if(ADC_min <= AL_MAX)
-			{
-				cylin[Count_OptOR-1].category = 0; // Alluminum
-			}
-			else if(ADC_min <= STL_MAX)
-			{
-				cylin[Count_OptOR-1].category = 0; // Steel
-			}
-			else if(ADC_min <= WPL_MAX){
-				cylin[Count_OptOR-1].category = 2; // White plastic
-			}
-			else if(ADC_min <= BPL_MAX){
-				cylin[Count_OptOR-1].category = 2; // Blk plastic
-			}
-			else
-				cylin[Count_OptOR-1].category = 4; // Unknown
-
-
+	
 	}
 
 // For optical 3, EX, PD3, INT3
 ISR(INT3_vect){
 	Count_OptEX=Count_OptEX+1;
-	struct cylinderMATERIAL cylin[48];
+	//struct cylinderMATERIAL cylin[48];
 
 	/*if (Count_OptEX <= 48)
 	{
