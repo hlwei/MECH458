@@ -132,6 +132,7 @@ void main()
 				goto BUCKET_STAGE;
 				break;
 			case (2):
+	
 				goto PUASE_BUTTON;
 				break;
 			case (3):
@@ -171,27 +172,32 @@ void main()
 
 
 	PUASE_BUTTON:
+        	if(((PINA & 0x04) == 0)&&(pauseflag==0))
+                     {
 
-		
+                        pauseflag = 1;//might be for testing
+                	Timer(20);//waitout 'contact bounce'
+			DCMotorCtrl(1);	//stop the belt
+			// Display sorted items
+			PORTC = AL_SortedCount;
+			mTimer(1000);
+			PORTC = STL_SortedCount;
+			mTimer(1000);
+			PORTC = WPL_SortedCount;
+			mTimer(1000);
+			PORTC = BPL_SortedCount;
+			mTimer(1000);
+			//TotalSorted = AL_SortedCount + STL_SortedCount + WPL_SortedCount + BPL_SortedCount;
+			//PORTC = (0xf0 + Count_OptOR - TotalSorted);
+                     }
+                 else if(((PINA & 0x04) == 4) && (pauseflag == 1))
+                     {
+                            Timer(20);//waitout 'contact bounce'
+                            pauseflag = 0;
+			 STATE = 0;
+		}
+	goto POLLING_STAGE;
 
-		DCMotorCtrl(1);			// 	stop the belt
-		// Display sorted items
-		PORTC = AL_SortedCount;
-		mTimer(1000);
-		PORTC = STL_SortedCount;
-		mTimer(1000);
-		PORTC = WPL_SortedCount;
-		mTimer(1000);
-		PORTC = BPL_SortedCount;
-		mTimer(1000);
-		//TotalSorted = AL_SortedCount + STL_SortedCount + WPL_SortedCount + BPL_SortedCount;
-		//PORTC = (0xf0 + Count_OptOR - TotalSorted);
-		STATE = 0;
-		goto POLLING_STAGE;
-
-		/*if (pauseflag == 0){
-			goto POLLING_STAGE;
-		}*/
 
 	RAMPDOWN:
 		//PORTC = 0xff;
@@ -479,15 +485,13 @@ ISR(INT3_vect){
 // For press buttom low to stop/resume the belt, PE4, INT4
 ISR(INT4_vect){
 
-			//STATE = 2;
-
-
-			if (((PINA & 0x01) == 0) && pauseflag == 1){
+	STATE = 2;
+			/*if (((PINA & 0x01) == 0) && pauseflag == 1){
 			mTimer(20);
 			if(){
 			}
 			STATE = 0;
-			pauseflag = 0;
+			pauseflag = 0;*/
 		}
 
 
