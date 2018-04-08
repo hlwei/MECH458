@@ -19,7 +19,7 @@ void configADC();
 
 /* Motors */
 // For DC motor
-volatile unsigned char dutyCycle = 0x70; 	// set PWM = 50%
+volatile unsigned char dutyCycle = 0x80; 	// set PWM = 50%
 volatile unsigned char DC_cw = 0x04;		// DC clockwise
 volatile unsigned char DC_ccw = 0x02;		// DC counter-clockwise
 volatile unsigned char DC_vccstop = 0x00;  	// vcc stop DC motot
@@ -71,6 +71,7 @@ void stepper_Home();
 void stepperRotate();
 int stepperSorting(int CurrentPosition, int DesiredPosition);
 
+int pauseflag = 0;
 
 typedef struct cylinderMATERIAL{
 	int category;		// AL = 0; STL = 2; WPL = 3; BPL = 1; UNKnown = 4;
@@ -97,10 +98,16 @@ unsigned char WPL_SortedCount = 0b00100000;
 unsigned char BPL_SortedCount = 0b00010000;
 unsigned char TotalSorted;
 
+// state
+
+char STATE;
+//char POLLING_STAGE;
+
 // Main function======================================================
 void main() 
 {	
 	STATE = 0;
+    
 	cli();
 
 	configIO();
@@ -110,14 +117,16 @@ void main()
 
 	sei();
 	stepper_Home();
-
+while(1){
 	goto POLLING_STAGE;
 
 	POLLING_STAGE:
 		DCMotorCtrl(0);			// start the motor
 		switch(STATE){
 			case (0):
+				//DCMotorCtrl(0);	
 				goto POLLING_STAGE;
+
 				break;
 			case (1):
 				goto BUCKET_STAGE;
@@ -134,7 +143,7 @@ void main()
 				goto POLLING_STAGE;
 
 		}
-
+}
 
 	BUCKET_STAGE:
 		DCMotorCtrl(1);			// stop the belt
@@ -147,7 +156,7 @@ void main()
 			case(0):
 				STL_SortedCount++;
 			case(1):
-				BLP_SortedCount++;
+				BPL_SortedCount++;
 			case(2):
 				AL_SortedCount++;
 			case(3):
@@ -155,11 +164,16 @@ void main()
 		}
 		// PORTC = CurrentPosition;
 		mTimer(400);
+		//DCMotorCtrl(0);
+		STATE = 0;	
 		goto POLLING_STAGE;
 
 
 
 	PUASE_BUTTON:
+
+		
+
 		DCMotorCtrl(1);			// 	stop the belt
 		// Display sorted items
 		PORTC = AL_SortedCount;
@@ -170,12 +184,17 @@ void main()
 		mTimer(1000);
 		PORTC = BPL_SortedCount;
 		mTimer(1000);
-		TotalSorted = AL_SortedCount + STL_SortedCount + WPL_SortedCount + BPL_SortedCount;
-		PORTC = (0xf0 + Count_OptOR - TotalSorted);
-		mTimer(1000);
+		//TotalSorted = AL_SortedCount + STL_SortedCount + WPL_SortedCount + BPL_SortedCount;
+		//PORTC = (0xf0 + Count_OptOR - TotalSorted);
+		STATE = 0;
+		goto POLLING_STAGE;
+
+		/*if (pauseflag == 0){
+			goto POLLING_STAGE;
+		}*/
 
 	RAMPDOWN:
-		PORTC = 0xff;
+		//PORTC = 0xff;
 
 	END:
 		DCMotorCtrl(1);
@@ -353,9 +372,9 @@ void stepperRotate(int steps, int direction) {
 				break;
 			default: break;
 		}//switch
-		//if((i>=4) && ((steps - i) >= 4)) delay = 8; //acceleration
-	    if((i<5) && (delay >= 6)) delay -= 2; //acceleration
-		if(((steps - i) <= 5) && (delay <=19)) delay += 2; //deceleration
+		if((i>=4) && ((steps - i) >= 4)) delay = 8; //acceleration
+	    //if((i<5) && (delay >= 6)) delay -= 2; //acceleration
+		//if(((steps - i) <= 5) && (delay <=19)) delay += 2; //deceleration
 	
 	}
 } 
@@ -407,7 +426,7 @@ ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 			{
 				cylin[Count_OptOR-1].category = 0; // Steel
 			}
-			else if(ADC_min <= 920){
+			else if(ADC_min <= 910){
 				cylin[Count_OptOR-1].category = 3; // White plastic
 			}
 			else if(ADC_min <= 1024){
@@ -459,12 +478,16 @@ ISR(INT3_vect){
 
 // For press buttom low to stop/resume the belt, PE4, INT4
 ISR(INT4_vect){
-	if (STATE == 0){
-		STATE = 2;
-	}
-	else
-		STATE = 0;
-		goto POLLING_STAGE;
+
+			STATE = 2;
+
+
+		/*	if (pauseflag == 1){
+			STATE = 0;
+			pauseflag = 0;
+		}*/
+
+
 }
 
 
