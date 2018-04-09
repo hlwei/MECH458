@@ -117,22 +117,22 @@ void main()
 
 	sei();
 	stepper_Home();
-//while(1){
+	DCMotorCtrl(0);	
+while(1){
+    DCMotorCtrl(0);
 	goto POLLING_STAGE;
-
+		
 	POLLING_STAGE:
 		DCMotorCtrl(0);			// start the motor
 		switch(STATE){
 			case (0):
 				//DCMotorCtrl(0);	
 				goto POLLING_STAGE;
-
 				break;
 			case (1):
 				goto BUCKET_STAGE;
 				break;
 			case (2):
-	
 				goto PUASE_BUTTON;
 				break;
 			case (3):
@@ -140,11 +140,12 @@ void main()
 				break;
 			case (4):
 				goto END;
+				break;
 			default:
 				goto POLLING_STAGE;
 
 		}
-//}
+}
 
 	BUCKET_STAGE:
 		DCMotorCtrl(1);			// stop the belt
@@ -172,38 +173,47 @@ void main()
 
 
 	PUASE_BUTTON:
-        	if(((PINA & 0x04) == 0)&&(pauseflag==0))
-                     {
-
-                        pauseflag = 1;//might be for testing
-                	Timer(20);//waitout 'contact bounce'
-			DCMotorCtrl(1);	//stop the belt
-			// Display sorted items
-			PORTC = AL_SortedCount;
-			mTimer(1000);
-			PORTC = STL_SortedCount;
-			mTimer(1000);
-			PORTC = WPL_SortedCount;
-			mTimer(1000);
-			PORTC = BPL_SortedCount;
-			mTimer(1000);
-			//TotalSorted = AL_SortedCount + STL_SortedCount + WPL_SortedCount + BPL_SortedCount;
-			//PORTC = (0xf0 + Count_OptOR - TotalSorted);
-                     }
-                 else if(((PINA & 0x04) == 4) && (pauseflag == 1))
-                     {
-                            Timer(20);//waitout 'contact bounce'
-                            pauseflag = 0;
-			 STATE = 0;
+		if (pauseflag == 1){
+		
+		mTimer(20);
+		pauseflag=0;
+		//DCMotorCtrl(1);			// 	stop the belt
+		// Display sorted items
+		/*PORTC = AL_SortedCount;
+		mTimer(1000);
+		PORTC = STL_SortedCount;
+		mTimer(1000);
+		PORTC = WPL_SortedCount;
+		mTimer(1000);
+		PORTC = BPL_SortedCount;
+		mTimer(1000);*/
+		//TotalSorted = AL_SortedCount + STL_SortedCount + WPL_SortedCount + BPL_SortedCount;
+		//PORTC = (0xf0 + Count_OptOR - TotalSorted);
+		STATE = 4;
+		goto POLLING_STAGE;
 		}
-	goto POLLING_STAGE;
+
+
+		else if (pauseflag == 0){
+		mTimer(20);
+		pauseflag = 1;
+		STATE = 0;
+		DCMotorCtrl(0);
+		goto POLLING_STAGE;
+		}
 
 
 	RAMPDOWN:
-		//PORTC = 0xff;
+		
+
+	/*	PORTC = 0xff;
+		mTimer(2000);
+		STATE = 4;
+		goto END;*/
 
 	END:
 		DCMotorCtrl(1);
+		goto POLLING_STAGE;
 
 
 	//DCMotorCtrl(system_state);
@@ -424,7 +434,7 @@ ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 		ADCSRA |= _BV(ADSC);
 	}
     else{
-			if(ADC_min <= 75)
+			if(ADC_min <= 180)
 			{
 				cylin[Count_OptOR-1].category = 2; // Alluminum
 			}
@@ -432,7 +442,7 @@ ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 			{
 				cylin[Count_OptOR-1].category = 0; // Steel
 			}
-			else if(ADC_min <= 920){
+			else if(ADC_min <= 933){
 				cylin[Count_OptOR-1].category = 3; // White plastic
 			}
 			else if(ADC_min <= 1024){
@@ -440,9 +450,9 @@ ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 			}
 			else
 				cylin[Count_OptOR-1].category = 4; // Unknown
-		/*PORTC = ADC_min;
+		PORTC = ADC_min;
 		PORTD = (ADC_min & 0xFF00) >> 3;
-		mTimer(2000);*/
+		//mTimer(2000);*/
 
 	}
 }
@@ -485,16 +495,15 @@ ISR(INT3_vect){
 // For press buttom low to stop/resume the belt, PE4, INT4
 ISR(INT4_vect){
 
+	/*if (pauseflag == 1){
+		pauseflag = 0;
+		PORTC = 0xf0;
+	}
+	else{
+		pauseflag = 1;
+		PORTC = 0x0f;
+	}*/
 	STATE = 2;
-			/*if (((PINA & 0x01) == 0) && pauseflag == 1){
-			mTimer(20);
-			if(){
-			}
-			STATE = 0;
-			pauseflag = 0;*/
-		}
-
-
 }
 
 
@@ -507,6 +516,7 @@ ISR(INT5_vect){
 // For press button high, PE6
 ISR(INT6_vect){
 	//DCMotorCtrl(0);
+	STATE = 3;
 }
 
 
