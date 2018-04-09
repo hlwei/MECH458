@@ -121,12 +121,13 @@ void main()
 			case (4):
 				goto END;
 				break;
-			case (5): 
-				goto MAG_STAGE;
-				break;
+			//case (5): 
+			//	goto MAG_STAGE;
+			//	break;
 			default:
 				goto POLLING_STAGE;
 		}
+		
 	
 	BUCKET_STAGE:
 		DCMotorCtrl(1);			// stop the belt
@@ -184,12 +185,13 @@ void main()
 		DCMotorCtrl(0);
 		STATE = 0;
 		goto POLLING_STAGE;
-		}
+		
 
 	RAMPDOWN:
-		PORTB = 0b00000100;
+		//PORTB = 0b00000110;
 		cli();
-		while(1){
+		
+		//while(1){
 			PORTC = AL_SortedCount;
 			mTimer(1000);
 			PORTC = STL_SortedCount;
@@ -201,19 +203,20 @@ void main()
 			TotalSorted = AL_SortedCount + STL_SortedCount + WPL_SortedCount + BPL_SortedCount;
 			PORTC = (0xf0 + Count_OptOR - TotalSorted);
 			mTimer(1000);
+			DCMotorCtrl(1);
+			mTimer(10000);
 
-		}	
+	//	}
+		//DCMotor	
 
 	END:
-		//DCMotorCtrl(1);
-		//goto POLLING_STAGE;
 		return(0);
-	MAG_STAGE:
+//	MAG_STAGE:
 		
-		STATE = 0;
-		goto POLLING_STAGE;
+	//	STATE = 0;
+		//goto POLLING_STAGE;
 
-
+}
 /* ------------- Configurations ----------- */
 /* ---------------------------------------- */
 // Fini Mar 29, 3.25PM
@@ -331,8 +334,8 @@ void stepperRotate(int steps, int direction) {
 			default: break;
 		}//switch
 		if((i>=4) && ((steps - i) >= 4)) delay = 8; //acceleration
-	    //if((i<5) && (delay >= 6)) delay -= 2; //acceleration
-		//if(((steps - i) <= 5) && (delay <=19)) delay += 2; //deceleration	
+	    //if((i<5) && (delay >= 10)) delay -= 2; //acceleration
+		//if(((steps - i) <= 5) && (delay <=20)) delay += 2; //deceleration	
 	}
 } 
 
@@ -369,7 +372,7 @@ ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 		ADCSRA |= _BV(ADSC);
 	}
     else{
-			if(ADC_min <= 180)
+			if(ADC_min <= 100)
 			{
 				cylin[Count_OptOR-1].category = 2; // Alluminum
 			}
@@ -377,7 +380,7 @@ ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 			{
 				cylin[Count_OptOR-1].category = 0; // Steel
 			}
-			else if(ADC_min <= 933){
+			else if(ADC_min <= 860){
 				cylin[Count_OptOR-1].category = 3; // White plastic
 			}
 			else if(ADC_min <= 1024){
@@ -385,7 +388,7 @@ ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 			}
 			else
 				cylin[Count_OptOR-1].category = 4; // Unknown
-		PORTC = ADC_min;
+		//PORTC = ADC_min;
 		PORTD = (ADC_min & 0xFF00) >> 3;
 		//mTimer(2000);
 	}
