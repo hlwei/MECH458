@@ -1,10 +1,6 @@
 
 // STAET MACHINE VERSION
-// SAT APR 7, 12.50PM
-
-
-
-
+// SAT APR 09, 12.50PM
 #include <avr/interrupt.h>
 #include <avr/io.h>
 #include <stdlib.h>
@@ -15,7 +11,6 @@ void configIO();
 void configInterrupts();
 void configPWM();
 void configADC();
-
 
 /* Motors */
 // For DC motor
@@ -36,12 +31,11 @@ char stepper_State;			// s1, s2, s3 ou s4
 char CurrentPosition;		// AL0, Blk1, Whit2, STL3, Unknown4
 char DesiredPosition;
 
-
-
 /* Sensors */
 // For optical sensor IO
 volatile unsigned int Count_OptIO = 0x00;
 volatile unsigned int Enter_Flag = 0;
+
 // For inductive sensor IN
 volatile unsigned int Count_IndIN = 0x00;
 volatile unsigned int Inductive_Flag = 0;
@@ -49,8 +43,6 @@ volatile unsigned int Inductive_Flag = 0;
 // For optical sensor OR
 unsigned int Count_OptOR = 0;
 volatile unsigned int OR_Flag = 0;
-
-
 
 // For reflective sensor RL ADC
 volatile unsigned char ADC_resultH;
@@ -62,6 +54,7 @@ volatile unsigned int ADC_min; // 16_bit to save 10-bit ADC reflectness
 // For optical sensor EX
 volatile unsigned int Count_OptEX = 0;
 volatile unsigned int Exit_Flag = 0;
+
 // For Hall Effect sensor HE
 unsigned int Hall_Flag = 0;
 
@@ -79,19 +72,13 @@ typedef struct cylinderMATERIAL{
 struct cylinderMATERIAL cylin[48];
 /* Cylinder Info Storage */
 // For reflective values of different materials
-
 int AL_MAX = 67;
-
 int STL_MIN = 423;
-
 int WPL_MIN = 862;
-
 int WPL_MAX = 870;
-
 int BPL_MIN = 924;
 
 // Cylinders count
-
 unsigned char AL_SortedCount = 0b10000000;
 unsigned char STL_SortedCount = 0b01000000;
 unsigned char WPL_SortedCount = 0b00100000;
@@ -99,34 +86,27 @@ unsigned char BPL_SortedCount = 0b00010000;
 unsigned char TotalSorted;
 
 // state
-
 char STATE;
-//char POLLING_STAGE;
 
+//char POLLING_STAGE;
 // Main function======================================================
 void main() 
 {	
-	STATE = 0;
-    
+	STATE = 0;   
 	cli();
-
 	configIO();
 	configInterrupts();
 	configPWM(dutyCycle);
 	configADC();
-
 	sei();
 	stepper_Home();
-	DCMotorCtrl(0);	
-while(1){
-    DCMotorCtrl(0);
-	goto POLLING_STAGE;
-		
+	//DCMotorCtrl(0);	
+	goto POLLING_STAGE;	
+	// POLLING STAGE
 	POLLING_STAGE:
 		DCMotorCtrl(0);			// start the motor
 		switch(STATE){
-			case (0):
-				//DCMotorCtrl(0);	
+			case (0):	
 				goto POLLING_STAGE;
 				break;
 			case (1):
@@ -141,12 +121,13 @@ while(1){
 			case (4):
 				goto END;
 				break;
+			case (5): 
+				goto MAG_STAGE;
+				break;
 			default:
 				goto POLLING_STAGE;
-
 		}
-}
-
+	
 	BUCKET_STAGE:
 		DCMotorCtrl(1);			// stop the belt
 
@@ -173,88 +154,68 @@ while(1){
 
 
 	PUASE_BUTTON:
-		if (pauseflag == 1){
-		
-		mTimer(20);
-		pauseflag=0;
+		mTimer(10);
+	        DCMotorCtrl(1);
+		while(pauseflag == 1){
+		//mTimer(10);
+		//pauseflag=0;
 		//DCMotorCtrl(1);			// 	stop the belt
 		// Display sorted items
-		/*PORTC = AL_SortedCount;
-		mTimer(1000);
-		PORTC = STL_SortedCount;
-		mTimer(1000);
-		PORTC = WPL_SortedCount;
-		mTimer(1000);
-		PORTC = BPL_SortedCount;
-		mTimer(1000);*/
-		//TotalSorted = AL_SortedCount + STL_SortedCount + WPL_SortedCount + BPL_SortedCount;
-		//PORTC = (0xf0 + Count_OptOR - TotalSorted);
-		STATE = 4;
-		goto POLLING_STAGE;
+			if(pauseflag == 0) break;
+			PORTC = AL_SortedCount;
+			mTimer(1000);
+			if(pauseflag == 0) break;
+			PORTC = STL_SortedCount;
+			mTimer(1000);
+			if(pauseflag == 0) break;
+			PORTC = WPL_SortedCount;
+			mTimer(1000);
+			if(pauseflag == 0) break;
+			PORTC = BPL_SortedCount;
+			mTimer(1000);
+			if(pauseflag == 0) break;
+			TotalSorted = AL_SortedCount + STL_SortedCount + WPL_SortedCount + BPL_SortedCount;
+			PORTC = (0xf0 + Count_OptOR - TotalSorted);
+			mTimer(1000);
+			//STATE = 4;
+			//goto POLLING_STAGE;
+			if(pauseflag == 0) break;
 		}
-
-
-		else if (pauseflag == 0){
-		mTimer(20);
-		pauseflag = 1;
-		STATE = 0;
 		DCMotorCtrl(0);
+		STATE = 0;
 		goto POLLING_STAGE;
 		}
-
 
 	RAMPDOWN:
-		
+		PORTB = 0b00000100;
+		cli();
+		while(1){
+			PORTC = AL_SortedCount;
+			mTimer(1000);
+			PORTC = STL_SortedCount;
+			mTimer(1000);
+			PORTC = WPL_SortedCount;
+			mTimer(1000);
+			PORTC = BPL_SortedCount;
+			mTimer(1000);
+			TotalSorted = AL_SortedCount + STL_SortedCount + WPL_SortedCount + BPL_SortedCount;
+			PORTC = (0xf0 + Count_OptOR - TotalSorted);
+			mTimer(1000);
 
-	/*	PORTC = 0xff;
-		mTimer(2000);
-		STATE = 4;
-		goto END;*/
+		}	
 
 	END:
-		DCMotorCtrl(1);
+		//DCMotorCtrl(1);
+		//goto POLLING_STAGE;
+		return(0);
+	MAG_STAGE:
+		
+		STATE = 0;
 		goto POLLING_STAGE;
-
-
-	//DCMotorCtrl(system_state);
-
-	// while(1){
-	// 	if (Enter_Flag == 1){
-	// 		Enter_Flag = 0;
-	// 	}
-	// 	if (Inductive_Flag == 1){
-	// 		Inductive_Flag = 0;
-	// 	if (Count_OptIO >= 1)
-	// 		{
-	// 			cylin[Count_OptIO-1].inductive = 1;
-	// 		}
-	// 	}
-        
-	// 	/*if (OR_Flag == 1){
-	// 		OR_Flag = 0;
-	// 	}*/
-	// 	if (Exit_Flag == 1)
-	// 	{	
-	// 		DCMotorCtrl(1);		// belt stop for 0.5s
-			
-	// 		DesiredPosition = cylin[Count_OptEX-1].category;
-			
-	// 	    CurrentPosition = stepperSorting(CurrentPosition, DesiredPosition);
-	// 		//PORTC = CurrentPosition;
-	// 		mTimer(400);
-			
-	// 	    Exit_Flag = 0;
-	// 	}
-	// 	DCMotorCtrl(system_state);
-
-	//}
-
-}
 
 
 /* ------------- Configurations ----------- */
 /* ---------------------------------------- */
-
 // Fini Mar 29, 3.25PM
 void configIO(){
 	/* IO Ports Definition */
@@ -266,7 +227,6 @@ void configIO(){
 	DDRF = 0x00;	// PORTF1 Reflective ADC interupt
 }
 
-
 void configPWM(int duty_cyc){
 	TCCR0A |= _BV(WGM00) | _BV(WGM01) | _BV(COM0A1);
 	TCCR0B |= _BV(CS01);
@@ -275,45 +235,32 @@ void configPWM(int duty_cyc){
 }
 
 // la Fini, Mar 29, 3PM
-
 void configADC(){
-	ADCSRA |= _BV(ADEN); 							// enable adc
-	ADCSRA |= _BV(ADIE);							// enable interrupt of adc
-	ADCSRA |= (_BV(ADPS2) | _BV(ADPS0));			// adc scaler division factor 32
-	//ADCSRA |= _BV(ADSC)		// for the first conversion
-							// set 10bit ADC value structure, ADCH[7,0] = ADC[9,2], ADCL[7,6] = ADC[1,0]
-	ADMUX |= _BV(REFS0); 			// Vcc 3.3v Voltage reference with external capacitor on AREF pin
-	ADMUX |= _BV(MUX0);								// channel select, ADC1
-
+	ADCSRA |= _BV(ADEN); // enable adc
+	ADCSRA |= _BV(ADIE); // enable interrupt of adc
+	ADCSRA |= (_BV(ADPS2) | _BV(ADPS0)); // adc scaler division factor 32
+	//ADCSRA |= _BV(ADSC)	// for the first conversion
+	// set 10bit ADC value structure, ADCH[7,0] = ADC[9,2], ADCL[7,6] = ADC[1,0]
+	ADMUX |= _BV(REFS0); // Vcc 3.3v Voltage reference with external capacitor on AREF pin
+	ADMUX |= _BV(MUX0); // channel select, ADC1
 }
 
 // la Fini, Mar 29, 3PM
 void configInterrupts(){
 	EIMSK |= 0b01111111;					// Enable INT0-6
-
 	// Rising edge: INT2 & INT 6
 	EICRA |= (_BV(ISC20) | _BV(ISC21));		// INT2 rising edge
 	EICRB |= (_BV(ISC60) | _BV(ISC61));		// INT6 rising edge
-
 	// Falling edge: INT0,1,3,4,5
 	EICRA |= _BV(ISC01);					// INT0 falling edge
 	EICRA |= _BV(ISC11);					// INT1 falling edge
 	EICRA |= _BV(ISC31);					// INT3 falling edge
-
 	EICRB |= _BV(ISC41);					// INT4 falling edge
 	EICRB |= _BV(ISC51);					// INT5 falling edge
-
 }
-
-
-
-
-
-
 
 /* --------------- Motors Ctrl ------------ */
 /* ---------------------------------------- */
-
 void DCMotorCtrl(char sysSTATE){
 	switch (sysSTATE){
 		case 0:
@@ -324,12 +271,10 @@ void DCMotorCtrl(char sysSTATE){
 			break;
 	}
 }
+
 // stepper go home
 void stepper_Home(){
-	
-
-    while(Hall_Flag == 0){
-			
+    while(Hall_Flag == 0){			
 			if (Hall_Flag == 0){
 				PORTA = STEP1;
 				mTimer(20);
@@ -349,10 +294,7 @@ void stepper_Home(){
 				PORTA = STEP4;
 				mTimer(20);
 				stepper_State = 4;
-			}
-			//stepperRotate(1,1);
-
-		  
+			}	  
 	}
 	CurrentPosition = 1;
 }
@@ -390,15 +332,12 @@ void stepperRotate(int steps, int direction) {
 		}//switch
 		if((i>=4) && ((steps - i) >= 4)) delay = 8; //acceleration
 	    //if((i<5) && (delay >= 6)) delay -= 2; //acceleration
-		//if(((steps - i) <= 5) && (delay <=19)) delay += 2; //deceleration
-	
+		//if(((steps - i) <= 5) && (delay <=19)) delay += 2; //deceleration	
 	}
 } 
 
-
 //stepper_position
 int stepperSorting(int CurrentPosition, int DesiredPosition){
-
 	int diff = (DesiredPosition - CurrentPosition);
 	if((diff == 1) || (diff == -3)){
 	stepperRotate(50, 1);
@@ -418,14 +357,10 @@ int stepperSorting(int CurrentPosition, int DesiredPosition){
 	return CurrentPosition;
 }
 
-
-
-
 /* ----------- Des for interrupts --------- */
 /* ---------------------------------------- */
 // For ADC conversion, RL, PF1, INTADC, la Fini Mar 29, 3.25PM
 ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
-	
 	if (ADC < ADC_min){
 		ADC_min = ADC;
 	}
@@ -452,12 +387,9 @@ ISR(ADC_vect){					// ADC interrupt for reflecness conversion , PF1
 				cylin[Count_OptOR-1].category = 4; // Unknown
 		PORTC = ADC_min;
 		PORTD = (ADC_min & 0xFF00) >> 3;
-		//mTimer(2000);*/
-
+		//mTimer(2000);
 	}
 }
-
-
 
 // ISRs
 // For optical 1, IO, PD0, INT0
@@ -468,7 +400,7 @@ ISR(INT0_vect){
 
 // For inductive, IN, PD1, INT1
 ISR(INT1_vect){
-	Count_IndIN++;				// inductive, PD1, for metal cylinders, for falling edge trigger
+	Count_IndIN++;	// inductive, PD1, for metal cylinders, for falling edge trigger
 
 	//DCMotorCtrl(1);
 	//mTimer(1000);
@@ -479,9 +411,8 @@ ISR(INT1_vect){
 ISR(INT2_vect){					//  optical 2, PD2 
 	
 	Count_OptOR=Count_OptOR+1;
-	ADC_min = 0xffff;
-	//ADC_min =  0xff;			// reset ADC_min value
-	ADCSRA|= _BV(ADSC); 		// rising on INT2, start ADC conversion
+	ADC_min = 0xffff; // reset ADC_min value
+	ADCSRA|= _BV(ADSC); // rising on INT2, start ADC conversion
 	
 	}
 
@@ -491,35 +422,30 @@ ISR(INT3_vect){
 	STATE = 1;		// goto BUTKET_STAGE
 }
 
-
 // For press buttom low to stop/resume the belt, PE4, INT4
 ISR(INT4_vect){
-
-	/*if (pauseflag == 1){
+        mTimer(20);
+	if (pauseflag == 1){
 		pauseflag = 0;
-		PORTC = 0xf0;
+		//PORTC = 0xf0;
 	}
 	else{
 		pauseflag = 1;
-		PORTC = 0x0f;
-	}*/
-	STATE = 2;
+		//PORTC = 0x0f;
+		STATE = 2;
+	}
+	
 }
-
 
 ISR(INT5_vect){
 	Hall_Flag = 1;
 }
-
-
 
 // For press button high, PE6
 ISR(INT6_vect){
 	//DCMotorCtrl(0);
 	STATE = 3;
 }
-
-
 
 // the timer1
 void mTimer(int count){
