@@ -303,7 +303,10 @@ void stepper_Home(){
 }
 
 void stepperRotate(int steps, int direction) {
-	int delay = 20;
+	//20;20ms corresponds to 50 steps per second
+	uint8_t maxdelay = 15;
+	uint8_t mindelay = 7;//5ms corresponds to 200 steps per second; or 1 revolution per second
+	int delay = maxdelay;
 	int i;
 	int stepnum =stepper_State;
 	for(i=0;i<steps;i++){
@@ -314,7 +317,7 @@ void stepperRotate(int steps, int direction) {
 			case(1):
 				PORTA = STEP1;
 				mTimer(delay);
-                stepper_State=1;
+                	stepper_State=1;
 				break;
 			case(2):
 				PORTA = STEP2;
@@ -333,9 +336,12 @@ void stepperRotate(int steps, int direction) {
 				break;
 			default: break;
 		}//switch
-		if((i>=4) && ((steps - i) >= 4)) delay = 8; //acceleration
+		//if((i>=4) && ((steps - i) >= 4)) delay = 8; //acceleration
 	    //if((i<5) && (delay >= 10)) delay -= 2; //acceleration
-		//if(((steps - i) <= 5) && (delay <=20)) delay += 2; //deceleration	
+		//if(((steps - i) <= 5) && (delay <=20)) delay += 2; //deceleration
+		if((i<10) && (delay>=mindelay)) delay -= 1 ; //acceleration
+	        if (((steps-i)<10) && (delay<=maxdelay)) delay += 1;
+		//else delay = 6;
 	}
 } 
 
@@ -454,7 +460,7 @@ ISR(INT6_vect){
 void mTimer(int count){
 	int i;
 	i = 0;
-	TCCR1B|=_BV(WGM12)|_BV(CS10);;
+	TCCR1B|=_BV(WGM12)|_BV(CS10);
 	OCR1A = 0x03e8;
 	TCNT1 = 0x0000;
 	//TIMSK1 = TIMSK1|0b00000010;
