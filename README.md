@@ -11,3 +11,5 @@
 
 2.Hardware connection:
 ![Alt text](https://github.com/hlwei/MECH458/blob/master/imgs/WechatIMG75.jpeg)
+
+# Final result: 38s/0error; 36s/1error!
